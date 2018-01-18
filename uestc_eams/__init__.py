@@ -8,7 +8,8 @@
     URLs
 '''
 from .session import LoginIndex, AuthHost, PortalIndex, SubmenuIndex\
-                    , ChildmenuIndex
+                    , ChildmenuIndex, EAMSBaseUrl, ElectCourseUrl\
+                    , ElectDefault, ElectStudentCount, ElectOperate
 
 '''
     Exceptions
