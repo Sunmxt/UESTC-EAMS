@@ -26,7 +26,7 @@ ElectCourseData = r'/stdElectCourse!data.action'
 ElectDefault = r'/stdElectCourse!defaultPage.action'
 ElectStudentCount = r'/stdElectCourse!queryStdCount.action'
 ElectOperate = r'/stdElectCourse!batchOperator.action'
-ElectCashChange r'/stdVirtualCashElect!changeVirtualCash.action'
+ElectCashChange = r'/stdVirtualCashElect!changeVirtualCash.action'
 
 '''
     Exceptions
