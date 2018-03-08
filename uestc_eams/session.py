@@ -5,38 +5,10 @@
 
 import requests
 import re
-import pdb
 
 
-'''
-    Setting
-'''
-UserAgent = r'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.104 Safari/537.36'
-LoginIndex = r'http://idas.uestc.edu.cn/authserver/login?service=http://portal.uestc.edu.cn/'
-AuthHost = "idas.uestc.edu.cn"
-PortalIndex = r'http://portal.uestc.edu.cn'
-LogoutUrl = r'/authserver/logout?service=/authserver/login'
-SubmenuIndex = r'http://eams.uestc.edu.cn/eams/home!submenus.action'
-ChildmenuIndex = r'http://eams.uestc.edu.cn/eams/home!childmenus.action?menu.id='
-
-'''
-    Exceptions
-'''
-class EAMSSessionException(Exception):
-    def __init__(self, *kargs):
-        super().__init__(*kargs)
-
-class EAMSLoginException(Exception):
-    def __init__(self, *karg):
-        super().__init__(*kargs)
-
-class UESTCIncorrentAccount(EAMSLoginException):
-    def __init__(self, *kargs):
-        super().__init__(*kargs)
-
-class EAMSException(Exception):
-    def __init__(self, *kargs):
-        super().__init__(*kargs)
+from .base import *
+from .elect_course import EAMSElectCourseSession
     
 '''
     Login form
@@ -69,79 +41,6 @@ class uestc_portal_login_form:
         }
 
 '''
-    Global
-'''
-
-def WrappedGet(_url, _my_session = None, **kwargs):
-    '''
-        Wrapper for requests.get()
-    '''
-
-    if(_my_session):
-        ss = _my_session
-    else:
-        ss = requests.Session()
-
-    target_url = _url
-
-    allow_redirects = kwargs.get('allow_redirects')
-    if(allow_redirects != None):
-        kwargs.pop('allow_redirects')
-
-    cookies = kwargs.get('cookies')
-    if(cookies):
-        ss.cookies.update(cookies)
-
-    while True:
-        rep = ss.get(target_url, allow_redirects = False, **kwargs)
-        if(rep.is_redirect):
-            if(allow_redirects == False):
-                return rep
-            target_url = rep.headers['Location']
-            continue
-        break
-
-    rep.cookies.update(ss.cookies)
-
-    return rep
-
-def WrappedPost(_url, _my_session = None, **kwargs):
-    '''
-        Wrapper for requests.post()
-    '''
-
-    if(_my_session):
-        ss = _my_session
-    else:
-        ss = requests.Session()
-
-    target_url = _url
-    allow_redirects = kwargs.get('allow_redirects')
-    if(allow_redirects != None):
-        kwargs.pop('allow_redirects')
-
-    cookies = kwargs.get('cookies')
-    if(cookies):
-        ss.cookies.update(cookies)
-
-    rep = ss.post(target_url, allow_redirects = False, **kwargs)
-    if(allow_redirects == False):
-        return rep
-
-    if('data' in kwargs.keys()):
-        kwargs.pop('data')
-
-    while rep.is_redirect:
-        target_url = rep.headers['Location']
-        rep = ss.get(target_url, allow_redirects = False, **kwargs)
-
-    return rep
-
-
-    
-re_host = re.compile(r'(?:.*?\://)(.+?(?=/)|.+)')
-
-'''
     Sessions
 '''
 
@@ -158,9 +57,18 @@ class EAMSSession:
                 ss.Login(_username = '2016xxxxxxxxx', _password = 'xxxxxx')
 
     '''
+
     @property
     def Logined(self):
         return self.__logined
+
+    @property
+    def ElectCourse(self):
+        if(not self.__elect_course_loaded):
+            self.__elect_course = self.__create_elect_course_session()
+            self.__elect_course_loaded = True
+        return self.__elect_course
+
 
     def __get_login_form_internal_value(self, _response, _name):
         patten = r'\<input\s*type="hidden"\s*name="' + _name + '"\s*value=\"(\S*)\"'
@@ -212,6 +120,19 @@ class EAMSSession:
     def __init__(self):
         self.Reset()
 
+    def __getstate__(self):
+        contents = self.__dict__.copy()
+
+        # elect course interface should not be pickled.
+        del contents['__elect_course_loaded']
+        del contents['__elect_course']
+        return contents
+
+    def __setstate__(self, _contents):
+        self.__dict__.update(_contents)
+        self.__elect_course_loaded = False
+        self.__elect_course = None
+
 
     def __check_session_expired(self):
         self.__cookiejar.clear_expired_cookies()
@@ -220,6 +141,24 @@ class EAMSSession:
     
     def __trace_login_failure(self, _session, _rep):
         pass
+
+    def __create_elect_course_session(self):
+        '''
+
+            Create a elect-course session and load platform information.
+
+            @Return:
+                EAMSElectCourseSession object.
+
+        '''
+        
+        if(not self.__logined and not self.Authenticate()):
+            raise EAMSSessionException('Not logined.')
+            return None
+           
+        ecss = EAMSElectCourseSession([self.__cookiejar], self)
+
+        return ecss
 
     def Reset(self):
         '''
@@ -230,6 +169,10 @@ class EAMSSession:
         self.__logined = False
         self.__login_form = uestc_portal_login_form()
         self.Submenus = []
+
+        self.__elect_course = None
+        self.__elect_course_loaded = False
+
 
     def IsAuthResponse(self, _response):
         '''
@@ -435,6 +378,7 @@ class EAMSSession:
 
                 reauth = True
             elif(rep.is_redirect and allow_redirects != False):
+                    self.__cookiejar.update(rep.cookies)
                     target_url = rep.headers['Location']
                     continue
                 
@@ -474,6 +418,7 @@ class EAMSSession:
         '''
 
         return self.TryRequestOp(_url, WrappedPost, **kwargs)
+
 
 
 def Login(_username, _password):
