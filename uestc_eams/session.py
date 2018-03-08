@@ -5,7 +5,6 @@
 
 import requests
 import re
-import pdb
 
 
 from .base import *
@@ -120,6 +119,19 @@ class EAMSSession:
 
     def __init__(self):
         self.Reset()
+
+    def __getstate__(self):
+        contents = self.__dict__.copy()
+
+        # elect course interface should not be pickled.
+        del contents['__elect_course_loaded']
+        del contents['__elect_course']
+        return contents
+
+    def __setstate__(self, _contents):
+        self.__dict__.update(_contents)
+        self.__elect_course_loaded = False
+        self.__elect_course = None
 
 
     def __check_session_expired(self):
@@ -366,6 +378,7 @@ class EAMSSession:
 
                 reauth = True
             elif(rep.is_redirect and allow_redirects != False):
+                    self.__cookiejar.update(rep.cookies)
                     target_url = rep.headers['Location']
                     continue
                 
