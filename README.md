@@ -83,7 +83,7 @@ import uestc_eams
 
      目前有两种选课类型：**权重**、**抢课**，它们的值各对应 **uestc_eams.CASH**和**uestc_eams.CATCH**。
 
-   - **查看可选课程信息：**
+   - **查看可选课程：**
 
      ```python
      session.ElectCourse.Platform['A'].Courses
@@ -94,12 +94,12 @@ import uestc_eams
      ```python
      [
         {
-       	    'name' : 课程名称
-       	    , 'id' : 课程ID
-       	    , 'credits' : 学分
-       	    , 'teachers' : 任课老师。**(tuple 对象)**
-       	    , 'campus' : 校区
-       	    , 'remark' : 备注
+       	   'name' : 课程名称
+       	   , 'id' : 课程ID
+       	   , 'credits' : 学分
+       	   , 'teachers' : 任课老师。(tuple 对象)
+       	   , 'campus' : 校区
+       	   , 'remark' : 备注
             , 'start_week' : 起始周
             , 'end_week' : 结束周
             , 'exam' : 考试时间
@@ -110,6 +110,27 @@ import uestc_eams
        , ...
      ]
      ```
+
+   - **查询课程容量**
+
+     以查询 ID 为 305362 的课程为例。
+
+     ```python
+     session.ElectCourse.Platform['A'].Counts[305362]
+     ```
+
+     ```python
+     {
+         'cross_limit': 跨院系选课人数上限,
+         'current': 当前平台已选人数,
+         'current_a': A平台已选人数,
+         'current_b': B平台已选人数,
+         'current_c': C平台已选人数,
+         'limit': 人数上限
+     }
+     ```
+
+     ​
 
    - **选课/退课：**
 
