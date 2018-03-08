@@ -9,6 +9,17 @@ import requests
 import re
 
 '''
+    Constants
+'''
+
+UNKNOWN = 0
+CASH = 1
+CATCH = 2
+
+ELECT = True
+CANCEL = False
+
+'''
     URLs
 '''
 
@@ -21,12 +32,14 @@ LogoutUrl = r'/authserver/logout?service=/authserver/login'
 SubmenuIndex = r'http://eams.uestc.edu.cn/eams/home!submenus.action'
 ChildmenuIndex = r'http://eams.uestc.edu.cn/eams/home!childmenus.action?menu.id='
 EAMSBaseUrl = r'http://eams.uestc.edu.cn/eams'
+EAMSHost = 'eams.uestc.edu.cn'
 ElectCourseUrl = r'/stdElectCourse.action'
 ElectCourseData = r'/stdElectCourse!data.action'
 ElectDefault = r'/stdElectCourse!defaultPage.action'
 ElectStudentCount = r'/stdElectCourse!queryStdCount.action'
 ElectOperate = r'/stdElectCourse!batchOperator.action'
-ElectCashChange r'/stdVirtualCashElect!changeVirtualCash.action'
+ElectCashChange = r'/stdVirtualCashElect!changeVirtualCash.action'
+
 
 '''
     Exceptions

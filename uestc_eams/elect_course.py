@@ -2,20 +2,11 @@
 
     Course electing module.
 
-
-    Need test:
-        1. elected course loading
-        2. cash changing operation
-        3. available course loading.
+    Available later:
+        1. Cash election
+        2. Election cash changing.
 
 '''
-
-UNKNOWN = 0
-CASH = 1
-CATCH = 2
-
-ELECT = True
-CANCEL = False 
 
 from .base import *
 
@@ -108,7 +99,7 @@ class EAMSElectCourseSession:
             if self.__elected_loaded:
                 return 
 
-            _elected = re.match('electedIds\["(.+)"\]', _page)
+            _elected = re.findall('electedIds\["(.+)"\]', _page)
             self.__elected = [int(x[1:]) if x[0]=='l' else int(x) for x in _elected]
 
             self.__elected_loaded = True
@@ -132,13 +123,11 @@ class EAMSElectCourseSession:
                     ,'Referer' : EAMSBaseUrl + ElectCourseUrl
                 }
 
-            #pdb.set_trace()
-            #rep = self.__session.TryRequestGet(full_url, headers = header)
-            #if(not rep):
-            #    return False
+            rep = self.__session.TryRequestGet(full_url, headers = header)
+            if(not rep):
+                return False
 
-            #$$$$$
-            m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', open('eams/cappkg/elect_default_page.html').read())
+            m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', rep.text)
             
             if(not m):
                 return False
@@ -165,18 +154,22 @@ class EAMSElectCourseSession:
             header = {
                 'User-Agent' : UserAgent
                 , 'Referer' : EAMSBaseUrl + self.__url
+                , 'Accept-Language' : 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7'
             }
-            '''
+
+            # Should access to main electing page firstly.
+            # Otherwise, server return HTTP Error 500 when trying to get student counts.
+            if not self.__basic_loaded:
+                self.__load_basic_infomation()
+
             rep = self.__session.TryRequestGet(\
                             EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
                             ,headers = header)
             if(not rep):
                 return 0
-            '''
+            
 
-            #lic = re.search(r'{.*}', rep.text)
-            #$$$$$$$
-            lic = re.search(r'{(.*)}', open('eams/cappkg/queryStdCount.action.js').read())
+            lic = re.search(r'{(.*)}', rep.text)
             if(not lic):
                 return 0
             cjd = eval('{' + lic.groups()[0] + '}', type('PARSE', (dict,), {'__getitem__': lambda s,n:n})())
@@ -208,42 +201,54 @@ class EAMSElectCourseSession:
                 'User-Agent' : UserAgent
                 , 'Referer' : EAMSBaseUrl + self.__url
             }
-            
+
+            # Need accessing to index page before getting other information.
+            # Otherwise, server will response HTTP Error 500
+            if not self.__basic_loaded:
+                self.__load_basic_infomation()
+
             rep = self.__session.TryRequestGet( \
                 EAMSBaseUrl + ElectCourseData + '?profileId=%d' % self.__profile_id \
                 , )
             if(not rep):
                 return 0
             
-            cj = re.search(r'{.*}', rep.text)
-            if(not cj):
+            m = re.search(r'\[(.*)\]', rep.text)
+            if not m:
                 return 0
-            cjd = eval('{'+ cj.groups[0] +'}', type('PARSE', (dict,), {'__getitem__': lambda s,n:n}))
 
-            self.__courses = {
-                _id : {
-                    'number' : info['no']
+            # Convert nonstandard json to python object.
+            cjd = eval(m.group(), type('PARSE', (dict,), {'__getitem__': lambda s,n:n})())
+            # Extract main information.
+            self.__courses = [
+                {
+                    'name' : info['name']
+                    ,'id' : info['id']
                     , 'credits': info['credits']
-                    , 'teachers' : info['teachers']
+                    , 'teachers' : tuple(re.findall('<a.*?>(.*)<.*/a>', info['teachers']))
                     , 'campus' : info['campusName']
-                    , 'remark' : info['electCourseRemark']
+                    , 'remark' : info['remark']
+                    , 'start_week' : info['startWeek']
+                    , 'end_week' : info['endWeek']
                     , 'exam' : info['examArrange']
-                    , 'arrange' : info['arrangeInfo']
-                } for _id, info in zip(cjd.keys(), cjd.values())
-            }
+                    , 'week_hour' : info['weekHour']
+                    , 'type' : info['courseTypeName']
+                    , 'room' : info['arrangeInfo'][0]['rooms']
+                } for info in cjd
+            ]
             
             self.__courses_loaded = True
 
-            return len(self.CourseById)
+            return len(self.__courses)
 
-        def Elect(self, _id, _op, _cash = 0):
+        def Elect(self, _id, _op, _force = False):
+        #def Elect(self, _id, _op, _cash = 0):
             '''
                 Elect the specified course.
 
                 @Params:
                     _id     [int]   Course ID
                     _op     [bool]  True(Elect) or False(Cancel)
-                    _cash   [int]   Cash. Ignored for cancel operation. Default to 0.
 
                 @Return:
                     A tuple :
@@ -256,19 +261,28 @@ class EAMSElectCourseSession:
             if(not isinstance(_op, bool)):
                 raise TypeError('_op should be a boolean')
                 return (False, 'Invailed parameters')
-            if(not isinstance(_op, int)):
+            if(not isinstance(_id, int)):
                 raise TypeError('_id should be a integar')
                 return (False, 'Invailed parameters')
+            if(not isinstance(_force, bool)):
+                raise TypeError('_force should be a boolean')
 
             if(not self.__basic_loaded):
                 self.__load_basic_infomation()
                 if(not self.__basic_loaded):
                     return (False, 'Unable to load basic information')
+
+            if not _force:
+                if not _id in self.__elected:
+                    return (False, 'Not a elected course.')
             
             header = {
                 'User-Agent' : UserAgent
-                , 'Referer' : EAMSBaseUrl + ElectDefault + '?profileId=%d' % self.__profile_id
+                , 'Referer' : EAMSBaseUrl + ElectDefault + '?electionProfile.id=%d' % self.__profile_id
                 , 'X-Requested-With' : 'XMLHttpRequest'
+                , 'Origin' : "http://" + EAMSHost
+                , 'Accept-Language' : 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7'
+                
             }
 
             op_data = {}
@@ -277,15 +291,15 @@ class EAMSElectCourseSession:
             else:
                 op_data['operator0'] = '%d:true:0' % _id
 
-            if(self.__elect_type == CASH):
-                op_data['virtualCashCost' + _id] = _cash
+            #if(self.__elect_type == CASH):
+            #    op_data['virtualCashCost' + _id] = _cash
 
-            rep = self.__session.TryRequestPost(EAMSBaseUrl + ElectOperate \
+            rep = self.__session.TryRequestPost(EAMSBaseUrl + ElectOperate + "?profileId=%d" % self.__profile_id \
                                 , headers = header, data = op_data)
             if(not rep):
                 return (False, 'Error occurs in POST request')
-            #text = open('eams/cappkg/batchop_reply.html').read()
-            #text = text.replace('\r', '').replace('\t', '').replace('\n', '')
+
+            # extract result message
             text = rep.text.replace('\r', '').replace('\t', '').replace('\n', '')
             m = re.search(r'<div(?:\s*.*?=\".*\")*\s*>(.*?)(?:\s*</.*>)*</div>', text)
             if(not m):
@@ -293,6 +307,7 @@ class EAMSElectCourseSession:
             else:
                 result_message = m.groups()[0]
 
+            # check whether operation is successful.
             m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', text)
             if(not m):
                 return (False, result_message)
@@ -312,43 +327,44 @@ class EAMSElectCourseSession:
             self.__counts_loaded = False
             self.__courses_loaded = False
             self.__basic_loaded = False
+        
+        #def ChangeCash(self, _id, _cash):
+        #    '''
+        #        Change electing cash.
 
-        def ChangeCash(self, _id, _cash):
-            '''
-                Change electing cash.
+        #        @Params:
+        #            _id             Course ID
+        #            _cash           New cash.
 
-                @Params:
-                    _id             Course ID
-                    _cash           New cash.
+        #        @Return:
+        #            return True if successfully change the cash.
+        #    '''
+        #    
+        #    if not isinstance(_id, int):
+        #        raise TypeError('_id should be a integar.')
+        #    if not isinstance(_cash, int):
+        #        raise TypeError('_cash should be a integar.')
 
-                @Return:
-                    return True if successfully change the cash.
-            '''
-            if not isinstance(_id, int):
-                raise TypeError('_id should be a integar.')
-            if not isinstance(_cash, int):
-                raise TypeError('_cash should be a integar.')
+        #    header = {
+        #        'UserAgent' : UserAgent
+        #        , 'Referer' : EAMSBaseUrl + ElectDefault + "?profileId=%d" % self.__profile_id
+        #        , 'X-Referered-With' : 'XMLHttpRequest'
+        #    } 
+        #    
+        #    op_data = {
+        #        'profileId' : self.__profile_id
+        #        , 'lessenId' : _id
+        #        , 'changeCost' : _cash
+        #    }
 
-            header = {
-                'UserAgent' : UserAgent
-                , 'Referer' : EAMSBaseUrl + ElectDefault + "?profileId=%d" % self.__profile_id
-                , 'X-Referered-With' : 'XMLHttpRequest'
-            } 
-            
-            op_data = {
-                'profileId' : self.__profile_id
-                , 'lessenId' : _id
-                , 'changeCost' : _cash
-            }
+        #    rep = self.__session.TryRequestPost(EAMSBaseUrl + ElectCashChange \
+        #                        , headers = header, data = op_data)
 
-            rep = self.__session.TryRequestPost(EAMSBaseUrl + ElectCashChange \
-                                , headers = header, data = op_data)
-
-            '''
-                Here check whether operation is succssful and extract extra information.
-                if not, return (False, result_message)
-            '''
-            return (True, result_message) 
+        #    '''
+        #        Here check whether operation is succssful and extract extra information.
+        #        if not, return (False, result_message)
+        #    '''
+        #    return (True, result_message) 
             
 
 
@@ -412,9 +428,7 @@ class EAMSElectCourseSession:
             return False
 
         plat_info = re.findall(r'(\w)平台.*?\<a.+?href=\"(.*?)\".*?\>\S*?进入选课'\
-                    , open('eams/cappkg/stdElectCourse.html').read(), flags=re.DOTALL)
-        #plat_info = re.findall(r'(\w)平台.*?\<a.+?href=\"(.*?)\".*?\>\S*?进入选课'\
-        #                        , rep.text)
+                                , rep.text, flags=re.DOTALL)
 
         if(len(plat_info) == 0):
             self.__opened = False
