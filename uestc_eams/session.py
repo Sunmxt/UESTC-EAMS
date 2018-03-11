@@ -6,7 +6,6 @@
 import requests
 import re
 
-
 from .base import *
 from .elect_course import EAMSElectCourseSession
     
@@ -124,8 +123,9 @@ class EAMSSession:
         contents = self.__dict__.copy()
 
         # elect course interface should not be pickled.
-        del contents['__elect_course_loaded']
-        del contents['__elect_course']
+        class_name = type(self).__name__
+        del contents[ '_' + class_name + '__elect_course_loaded']
+        del contents[ '_' + class_name + '__elect_course']
         return contents
 
     def __setstate__(self, _contents):

@@ -7,11 +7,6 @@
 UESTC 教务系统的 Python 库，主要方便拓展应用。
 
 
-
-*Note : 目前由于选课未开放，所有选课相关的接口都没有进行实际的测试，只完成了大部分逻辑，会在后面继续完善。*
-
-
-
 还没填的坑：
 
 * 查询课表
@@ -19,15 +14,15 @@ UESTC 教务系统的 Python 库，主要方便拓展应用。
 * 一些实际的应用（如抢课等）
 * ...
 
-除基本库外，还提供少量的应用，包含在 app 内。
+除基本库外，还提供少量的应用，包含在 app 内。(也属于要填的坑)
 
-
+目前还是有动力去填坑的，别担心。
 
 *依赖的三方库：* **requests**
 
 ---
 
-### 快速上手
+### **快速上手**
 
 ```python
 import uestc_eams
@@ -86,54 +81,70 @@ import uestc_eams
      session.ElectCourse.Platform['A'].ElectType
      ```
 
-     目前有两种选课类型：**权重**、**抢课**，它们的值各对应 **EAMSSession.CASH**和**EAMSSession.CATCH**。
+     目前有两种选课类型：**权重**、**抢课**，它们的值各对应 **uestc_eams.CASH**和**uestc_eams.CATCH**。
 
-   - **查看可选课程信息：**
+   - **查看可选课程：**
 
      ```python
      session.ElectCourse.Platform['A'].Courses
      ```
 
-     **Courses** 是 **dict** 对象。格式如下：
+     **Courses** 是 **list** 对象。格式如下：
+
+     ```python
+     [
+        {
+       	   'name' : 课程名称
+       	   , 'id' : 课程ID
+       	   , 'credits' : 学分
+       	   , 'teachers' : 任课老师。(tuple 对象)
+       	   , 'campus' : 校区
+       	   , 'remark' : 备注
+            , 'start_week' : 起始周
+            , 'end_week' : 结束周
+            , 'exam' : 考试时间
+            , 'week_hour' : 周学时
+            , 'type' : 课程性质
+            , 'room' : 上课教室
+       }
+       , ...
+     ]
+     ```
+
+   - **查询课程容量**
+
+     以查询 ID 为 305362 的课程为例。
+
+     ```python
+     session.ElectCourse.Platform['A'].Counts[305362]
+     ```
 
      ```python
      {
-       课程ID : {
-       	'number' : 课程序号
-       	, 'credits' : 学分
-       	, 'campus' : 校区
-       	, 'remark' : 备注
-       	, 'exam' : 考试时间
-       	, 'arrange' : 上课时间
-       }
-       , ...
+         'cross_limit': 跨院系选课人数上限,
+         'current': 当前平台已选人数,
+         'current_a': A平台已选人数,
+         'current_b': B平台已选人数,
+         'current_c': C平台已选人数,
+         'limit': 人数上限
      }
      ```
 
+     ​
+
    - **选课/退课：**
 
-     平台接口类提供了 **Elect()** 方法。
+     平台接口类提供了 **Elect()** 方法。目前仅支持抢课制。权重制和权重修改将在后续加入。
 
      - 例：选择A平台，ID为305362的课程。
 
-       若为**权重制**，权重20分：
-
        ```python
-       session.ElectCourse.Platform['A'].Elect(305362, EAMSSession.ELECT, 20)
-       ```
-
-       若为**抢课制**：
-
-       ```python
-       session.ElectCourse.Platform['A'].Elect(305362, EAMSSession.ELECT)
+       session.ElectCourse.Platform['A'].Elect(305362, uestc_eams.ELECT)
        ```
 
      - 例：退掉 ID 为 305362 的课程
 
        ```python
-       session.ElectCourse.Platform['A'].Elect(305362, EAMSSession.CANCEL)
+       session.ElectCourse.Platform['A'].Elect(305362, uestc_eams.CANCEL)
        ```
-
-       ​
-
 

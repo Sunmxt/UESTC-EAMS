@@ -10,6 +10,23 @@
 
 from .base import *
 
+def parse_arrange(_week_info):
+    c = 1
+    weeks = tuple(_week_info)
+    last = weeks[0]
+    res = []
+    if last == '1':
+        bg = c
+    for st in weeks[1:]:
+        if st != last:
+            if st == '0':
+                res.append((bg, c))
+            else:
+                bg = c + 1
+        last = st
+        c += 1
+    return tuple(res)
+
 class EAMSElectCourseSession:
     '''
         UESTC's course-elect interface.
@@ -225,15 +242,19 @@ class EAMSElectCourseSession:
                     'name' : info['name']
                     ,'id' : info['id']
                     , 'credits': info['credits']
-                    , 'teachers' : tuple(re.findall('<a.*?>(.*)<.*/a>', info['teachers']))
+                    , 'teachers' : tuple(re.findall('<a.*?>(.*?)<.*?/a>', info['teachers']))
                     , 'campus' : info['campusName']
                     , 'remark' : info['remark']
-                    , 'start_week' : info['startWeek']
-                    , 'end_week' : info['endWeek']
                     , 'exam' : info['examArrange']
                     , 'week_hour' : info['weekHour']
                     , 'type' : info['courseTypeName']
-                    , 'room' : info['arrangeInfo'][0]['rooms']
+                    , 'arrange' : tuple([{
+                        'day': arr['weekDay']
+                        , 'start': arr['startUnit']
+                        , 'end' : arr['endUnit']
+                        , 'weeks' : parse_arrange(arr['weekState'])
+                        , 'room' : arr['rooms']
+                    }   for arr in info['arrangeInfo']])
                 } for info in cjd
             ]
             
