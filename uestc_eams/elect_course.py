@@ -93,6 +93,7 @@ class EAMSElectCourseSession:
             self.__counts_loaded = False
             self.__courses_loaded = False
             self.__basic_loaded = False
+            self.__course_by_id = None
 
             self.__name = _name
 
@@ -140,12 +141,15 @@ class EAMSElectCourseSession:
                     ,'Referer' : EAMSBaseUrl + ElectCourseUrl
                 }
 
-            rep = self.__session.TryRequestGet(full_url, headers = header)
-            if(not rep):
-                return False
-
-            m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', rep.text)
             
+            #rep = self.__session.TryRequestGet(full_url, headers = header)
+            #if(not rep):
+            #    return False
+            
+            m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', open('eams/cappkg/elect_default_page.html').read())
+ 
+            #m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', rep.text)
+
             if(not m):
                 return False
 
@@ -156,8 +160,9 @@ class EAMSElectCourseSession:
 
             self.__basic_loaded = True
 
-            self.__load_elected_course_from_page(rep.text);
-                
+            
+            self.__load_elected_course_from_page(open('eams/cappkg/elect_default_page.html').read());
+            #self.__load_elected_course_from_page(rep.text);
 
             return True
 
@@ -179,14 +184,15 @@ class EAMSElectCourseSession:
             if not self.__basic_loaded:
                 self.__load_basic_infomation()
 
-            rep = self.__session.TryRequestGet(\
-                            EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
-                            ,headers = header)
-            if(not rep):
-                return 0
+            #rep = self.__session.TryRequestGet(\
+            #                EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
+            #                ,headers = header)
+            #if(not rep):
+            #    return 0
             
 
-            lic = re.search(r'{(.*)}', rep.text)
+            lic = re.search(r'{(.*)}', open('eams/cappkg/queryStdCount.action.js').read())
+            #lic = re.search(r'{(.*)}', rep.text)
             if(not lic):
                 return 0
             cjd = eval('{' + lic.groups()[0] + '}', type('PARSE', (dict,), {'__getitem__': lambda s,n:n})())
@@ -224,13 +230,14 @@ class EAMSElectCourseSession:
             if not self.__basic_loaded:
                 self.__load_basic_infomation()
 
-            rep = self.__session.TryRequestGet( \
-                EAMSBaseUrl + ElectCourseData + '?profileId=%d' % self.__profile_id \
-                , )
-            if(not rep):
-                return 0
-            
-            m = re.search(r'\[(.*)\]', rep.text)
+            #rep = self.__session.TryRequestGet( \
+            #    EAMSBaseUrl + ElectCourseData + '?profileId=%d' % self.__profile_id \
+            #    , )
+            #if(not rep):
+            #    return 0
+            #
+            #m = re.search(r'\[(.*)\]', rep.text)
+            m = re.search(r'\[(.*)\]', open('eams/cappkg/data.js').read())
             if not m:
                 return 0
 
@@ -261,6 +268,18 @@ class EAMSElectCourseSession:
             self.__courses_loaded = True
 
             return len(self.__courses)
+
+        def GetCourseByID(self, _id):
+            if not isinstance(_id, int):
+                raise TypeError('_id should be an integer.')
+
+            if not self.__course_by_id:
+                self.__course_by_id = {
+                    c['id'] : c for c in self.Courses
+                }
+
+            target = self.__course_by_id.get(_id)
+            return target
 
         def Elect(self, _id, _op, _force = False):
         #def Elect(self, _id, _op, _cash = 0):
@@ -348,7 +367,7 @@ class EAMSElectCourseSession:
             self.__counts_loaded = False
             self.__courses_loaded = False
             self.__basic_loaded = False
-        
+            self.__course_by_id = None
         #def ChangeCash(self, _id, _cash):
         #    '''
         #        Change electing cash.
@@ -391,6 +410,8 @@ class EAMSElectCourseSession:
 
     @property
     def Opened(self):
+        if(not self.__platform_loaded):
+            self.__load_platforms()
         return self.__opened
 
     @property
@@ -442,14 +463,17 @@ class EAMSElectCourseSession:
         }
 
 
-        rep = self.__session.TryRequestGet(EAMSBaseUrl + ElectCourseUrl \
-                                            , headers = header)
+        #rep = self.__session.TryRequestGet(EAMSBaseUrl + ElectCourseUrl \
+        #                                    , headers = header)
 
-        if(not rep):
-            return False
+        #if(not rep):
+        #    return False
 
+
+        #plat_info = re.findall(r'(\w)平台.*?\<a.+?href=\"(.*?)\".*?\>\S*?进入选课'\
+        #                        , rep.text, flags=re.DOTALL)
         plat_info = re.findall(r'(\w)平台.*?\<a.+?href=\"(.*?)\".*?\>\S*?进入选课'\
-                                , rep.text, flags=re.DOTALL)
+                                , open('eams/cappkg/stdElectCourse.html').read(), flags=re.DOTALL)
 
         if(len(plat_info) == 0):
             self.__opened = False
