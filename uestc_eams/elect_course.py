@@ -93,6 +93,7 @@ class EAMSElectCourseSession:
             self.__counts_loaded = False
             self.__courses_loaded = False
             self.__basic_loaded = False
+            self.__course_by_id = None
 
             self.__name = _name
 
@@ -140,12 +141,13 @@ class EAMSElectCourseSession:
                     ,'Referer' : EAMSBaseUrl + ElectCourseUrl
                 }
 
+            
             rep = self.__session.TryRequestGet(full_url, headers = header)
             if(not rep):
                 return False
-
-            m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', rep.text)
             
+            m = re.findall(r'var\s+virtualCashEnabled\s*=\s*(false|true)', rep.text)
+
             if(not m):
                 return False
 
@@ -156,8 +158,8 @@ class EAMSElectCourseSession:
 
             self.__basic_loaded = True
 
+            
             self.__load_elected_course_from_page(rep.text);
-                
 
             return True
 
@@ -179,11 +181,11 @@ class EAMSElectCourseSession:
             if not self.__basic_loaded:
                 self.__load_basic_infomation()
 
-            rep = self.__session.TryRequestGet(\
-                            EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
-                            ,headers = header)
-            if(not rep):
-                return 0
+            #rep = self.__session.TryRequestGet(\
+            #                EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
+            #                ,headers = header)
+            #if(not rep):
+            #    return 0
             
 
             lic = re.search(r'{(.*)}', rep.text)
@@ -262,6 +264,18 @@ class EAMSElectCourseSession:
 
             return len(self.__courses)
 
+        def GetCourseByID(self, _id):
+            if not isinstance(_id, int):
+                raise TypeError('_id should be an integer.')
+
+            if not self.__course_by_id:
+                self.__course_by_id = {
+                    c['id'] : c for c in self.Courses
+                }
+
+            target = self.__course_by_id.get(_id)
+            return target
+
         def Elect(self, _id, _op, _force = False):
         #def Elect(self, _id, _op, _cash = 0):
             '''
@@ -293,7 +307,7 @@ class EAMSElectCourseSession:
                 if(not self.__basic_loaded):
                     return (False, 'Unable to load basic information')
 
-            if not _force:
+            if not _force and _op == CANCEL:
                 if not _id in self.__elected:
                     return (False, 'Not a elected course.')
             
@@ -315,23 +329,24 @@ class EAMSElectCourseSession:
             #if(self.__elect_type == CASH):
             #    op_data['virtualCashCost' + _id] = _cash
 
+            pdb.set_trace()
             rep = self.__session.TryRequestPost(EAMSBaseUrl + ElectOperate + "?profileId=%d" % self.__profile_id \
                                 , headers = header, data = op_data)
             if(not rep):
                 return (False, 'Error occurs in POST request')
 
-            # extract result message
-            text = rep.text.replace('\r', '').replace('\t', '').replace('\n', '')
-            m = re.search(r'<div(?:\s*.*?=\".*\")*\s*>(.*?)(?:\s*</.*>)*</div>', text)
+            m = re.search(r'<div.*?>(.*?(成功|失败)[.<>]*?)(?:\s*</.*>)?</div>', rep.text, flags = re.DOTALL)
+            #m = re.search(r'<div(?:\s*.*?=\".*\")*\s*>(.*?(成功|失败).*?)(?:\s*</.*>)?</div>', rep.text, flags = re.DOTALL)
             if(not m):
-                result_message = ''
+                result_message = 'Unknown error.'
             else:
-                result_message = m.groups()[0]
+                result_message = m.groups()[0].replace('\n', '').replace('\t', '')
 
             # check whether operation is successful.
-            m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', text)
+            m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', rep.text, flags = re.DOTALL)
             if(not m):
                 return (False, result_message)
+
             m = m.groups()[0].replace('true', 'True').replace('false', 'False')
             update_dict = eval('{' + m + '}', type('PARSE', (dict,), {'__getitem__':lambda s,n:n})())
             if(update_dict.get('elected') != True):
@@ -348,7 +363,7 @@ class EAMSElectCourseSession:
             self.__counts_loaded = False
             self.__courses_loaded = False
             self.__basic_loaded = False
-        
+            self.__course_by_id = None
         #def ChangeCash(self, _id, _cash):
         #    '''
         #        Change electing cash.
@@ -391,6 +406,8 @@ class EAMSElectCourseSession:
 
     @property
     def Opened(self):
+        if(not self.__platform_loaded):
+            self.__load_platforms()
         return self.__opened
 
     @property
@@ -447,6 +464,7 @@ class EAMSElectCourseSession:
 
         if(not rep):
             return False
+
 
         plat_info = re.findall(r'(\w)平台.*?\<a.+?href=\"(.*?)\".*?\>\S*?进入选课'\
                                 , rep.text, flags=re.DOTALL)

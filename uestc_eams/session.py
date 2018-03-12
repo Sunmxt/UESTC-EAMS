@@ -344,13 +344,21 @@ class EAMSSession:
     def TryRequestOp(self, _url, _wrapped_op, **kwargs):
         '''
             Wrapper for request.post
+
+            WARNING : This method cannot be used to access to idas.uestc.edu.cn/authserver/login.
         '''
+
+        header = {
+            'User-Agent' : UserAgent
+        }
 
         target_url = _url
         cookies = kwargs.get('cookies')
         if(cookies):
             self.__cookiejar.update(cookies)
         kwargs['cookies'] = self.__cookiejar
+        user_header = kwargs.get('headers')
+        user_data = kwargs.get('data')
         allow_redirects = kwargs.get('allow_redirects')
 
         if(allow_redirects != None):
@@ -359,43 +367,45 @@ class EAMSSession:
         target_host = re_host.search(target_url).groups()[0]
 
         reauth = False
+        this_op = _wrapped_op
         while True:
-            rep = _wrapped_op(target_url, allow_redirects = False ,**kwargs)
-            if(_wrapped_op == WrappedPost):
-                _wrapped_op = WrappedGet
+            rep = this_op(target_url, allow_redirects = False ,**kwargs)
 
-            host = re_host.search(rep.url).groups()[0]
-            if(host == 'idas.uestc.edu.cn' and host != target_host):
-                if(reauth):
-                    raise EAMSLoginException('Authentication failure.')
-                    return None
-                
-                if(rep.is_redirect):
-                    if(target_host in self.__cookiejar.list_domains()):
-                        self.__cookiejar.clear(domain = target_host)
-                    target_url = rep.headers['Location']
-                    continue
-
-                reauth = True
-            elif(rep.is_redirect and allow_redirects != False):
-                    self.__cookiejar.update(rep.cookies)
-                    target_url = rep.headers['Location']
-                    continue
-                
-            if(rep.status_code != 200):
-               raise EAMSSessionException('Unknown error [Status code: %d]' % rep.status_code)
-               return None
-
-
-            m = re.findall(r'\<a.*?\s+href=\"(.*?)\".*?\>\s*?点击此处\s*?\</a\>继续', rep.text)
-            if(m):
-                self.__update_cookies(rep.cookies)
-                target_url = m[0]
+            self.__cookiejar.update(rep.cookies)
+            if rep.is_redirect:
+                target_url = rep.headers['Location']
+                if -1 == rep.url.find('idas.uestc.edu.cn/authserver/login'):
+                    reauth = True
+                elif allow_redirects == False:
+                    return rep
+                this_op = WrappedGet
+                header['Referer'] = rep.url
+                kwargs['headers'] = header
+                kwargs['data'] = None
                 continue
+            else:
+                if -1 != rep.url.find('idas.uestc.edu.cn/authserver/login'):
+                    self.__cookiejar.clear()
+                    if not self.Authenticate():
+                        raise EAMSLoginException('Authentication failure.')
+                        return None
+                    this_op = _wrapped_op
+                    target_url = _url
+                    kwargs['headers'] = user_header
+                    kwargs['data'] = user_data
+                    continue
+
+                if rep.status_code != 200:
+                    raise EAMSSessionException('Unknown error [Status code: %d]' % rep.status_code)
+                    return None
+
+                m = re.findall(r'\<a.*?\s+href=\"(.*?)\".*?\>\s*?点击此处\s*?\</a\>继续', rep.text)
+                if(m):
+                    self.__update_cookies(rep.cookies)
+                    target_url = m[0]
+                    continue
 
             break
-
-        self.__update_cookies(rep.cookies)
 
         return rep
 
