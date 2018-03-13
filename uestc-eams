@@ -1,0 +1,10 @@
+#! /usr/bin/python3
+
+import sys
+from uestc_eams.cli import EAMSCommandShell
+
+def __main__(arg_vector):
+    shell = EAMSCommandShell()
+    sys.exit(shell.Run(arg_vector))
+
+__main__(sys.argv)

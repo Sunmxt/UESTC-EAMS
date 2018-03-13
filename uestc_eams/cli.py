@@ -11,8 +11,8 @@ import os.path
 import getopt
 import sqlite3
 import pickle
-import pdb
 from .session import Login, EAMSSession
+from .base import ELECT, CANCEL
 
 '''
     Some constants
@@ -23,36 +23,36 @@ ERR_PARAMS = 1
 ERR_NETWORK = 2
 ERR_DB = 3
 
-HELP_TEXT = '\
-Access to UESTC EAMS system. \n\
-\n\
-Usage: %s <command> [options] < <username> -p <password> | -i account_id>\n\
-\n\
-Command:\n\
-    login       <account> [options]             Login with account.\n\
-    logout      <account_id>                    Logout.\n\
-    query                                       Query information\n\
-    elect                                       Elect course.\n\
-\n\
-Common options:\n\
-    -p  --password                              Specified account password.\n\
-    -i  --id                <account_id>        Specified account ID to logout.\n\
-\n\
-login options:\n\
-        --no-persist                            Do not keep login state.\n\
-\n\
-query options:\n\
-        --account                               List logined accounts.\n\
-        --elect-platform                        List available course electing platform.\n\
-        --electable         <platform_id>       List available courses in specified electing platform.\n\
-        --elected           <platform_id>       List elected platform.\n\
-\n\
-elect options:\n\
-    -I  --course-id         <course_id>         Course ID to elect.\n\
-    -d  --cancel            <course_id>         Cancel election of specified course.\n\
+HELP_TEXT = """
+Access to UESTC EAMS system. 
+
+Usage: %s <command> [options] < <username> -p <password> | -i account_id>
+
+Command:
+    login       <account> [options]             Login with account.
+    logout      <account_id>                    Logout.
+    query                                       Query information
+    elect                                       Elect course.
+
+Common options:
+    -p  --password                              Specified account password.
+    -i  --id                <account_id>        Specified account ID to logout.
+
+login options:
+        --no-persist                            Do not keep login state.
+
+query options:
+        --account                               List logined accounts.
+        --elect-platform                        List available course electing platform.
+        --electable         <platform_id>       List available courses in specified electing platform.
+        --elected           <platform_id>       List elected platform.
+
+elect options:
+    -I  --course-id         <course_id>         Course ID to elect.
+    -d  --cancel            <course_id>         Cancel election of specified course.
     -P  --platform          <platform_id>       Specified platform.
-\n\
-'
+    -f  --force                                 Force to Elect. (experimental)
+"""
 
 #    -c  --cash              <cash>              Cash to the course. If the specified course is elected, \n\
 #                                                cashes will be alter.\n\
@@ -176,9 +176,10 @@ class AccountDatabase:
         cur = self.__conn.cursor()
         self.Exception = None
         try:
-            cur.execute('UPDATE Accounts SET SessionObject=?  where (Username == ?)', (raw, username))
+            cur.execute('UPDATE Accounts SET SessionObject=?  where (Username == ?)', (raw, _username))
+            self.__conn.commit()
             cur.close()
-        except sqlite3.OperationError as s:
+        except sqlite3.OperationalError as s:
             self.Exception = s
             self.Throw()
             return False
@@ -210,7 +211,7 @@ class AccountDatabase:
         cur = self.__conn.cursor()
         self.Exception = None
         try:
-            cur.execute('SELECT ID FROM Accounts where Username == ?' % _username)
+            cur.execute('SELECT ID FROM Accounts where Username == ?' , (_username,))
         except sqlite3.OperationalError as s:
             self.Exception = s
             self.Throw()
@@ -220,6 +221,63 @@ class AccountDatabase:
         if len(res) < 1:
             return None
         return res[0][0]
+
+    def QueryUsernameByID(self, _id):
+        if not isinstance(_id, int):
+            raise TypeError('_id should be an integer.') 
+
+        cur = self.__conn.cursor()
+        self.Exception = None
+        try:
+            cur.execute('SELECT Username FROM Accounts where ID == ?', (_id,))
+        except sqlite3.OperationalError as s:
+            self.Exception = s
+            self.Throw()
+            return False
+        res = cur.fetchall()
+        cur.close()
+        if len(res) < 1:
+            return None
+        return res[0][0]
+        
+
+    def DropSession(self, _username = None, _id = None):
+        if _id and not isinstance(_id, int):
+            raise('_id should be a integer')
+            return False
+        if _username and not isinstance(_username, str):
+            raise('_username should be str.')
+            return False
+
+        if _id:
+            if _username:
+                username = self.QueryUsernameFromID(_id)
+                if _id != username or not username:
+                    return False
+            cur = self.__conn.cursor()
+            self.Exception = None
+            try:
+                cur.execute('DELETE FROM Accounts WHERE ID == ?', (_id,))
+                self.__conn.commit()
+            except sqlite3.OperationalError as s:
+                self.Exception = s
+                self.Throw()
+                return False
+        elif _username:
+            cur = self.__conn.cursor()
+            try:
+                cur.execute('DELETE FROM Accounts WHERE Username == ?' , (_username,))
+                self.__conn.commit()
+            except sqlite3.OperationalError as s:
+                self.Exception = s
+                self.Throw()
+                return False
+        else:
+            raise TypeError('_id or _username should be given.')
+            return False
+            
+        return True
+        
 
 def TablePrint(_data, _limits, _margin):
     '''
@@ -318,7 +376,7 @@ class EAMSCommandShell:
         return True
 
     
-    def __login(self, _user, _password, _id, _db_first = True):
+    def __login(self, _user, _password, _id = None, _db_first = True):
         # Firstly, check whether logined.
         if _id:
             username, session = self.__account_db.GetSessionFromID(_id)
@@ -359,10 +417,11 @@ class EAMSCommandShell:
             return ERR_NETWORK
         if id:
             print('Username : %s (ID : %d)' % (id_user, self.__id)) 
+            self.__username = id_user
         else:
             print('Login successfully.')
 
-        return ERR_OK
+        return retval, session
 
     def DoLogin(self, _arguments):
         long_opt = ['no-persist',  'password']
@@ -408,7 +467,7 @@ class EAMSCommandShell:
         if id:
             print('User %s has logined. (ID : %d)' % (self.__username, id))
             return ERR_PARAMS
-        if ret != ERR_OK:
+        if retval != ERR_OK:
             print('Cannot login.')
             return ret
         if self.__no_persist:
@@ -421,7 +480,7 @@ class EAMSCommandShell:
             return ERR_DB
 
         # Check whether session is saved
-        id = self.__account_db.QueryIDByUsername(self.__username, ss)
+        id = self.__account_db.QueryIDByUsername(self.__username)
         if id == None:
             print('Cannot save session : ', end = '')
             print(self.__account_db.Exception)
@@ -431,9 +490,57 @@ class EAMSCommandShell:
 
         return ERR_OK 
         
-    def DoLogout(self, _arguments): 
-         
-        pass
+    def DoLogout(self, _arguments):
+        long_opt = ['id']
+        opts, extra = getopt.gnu_getopt(_arguments, 'i:', long_opt)
+
+        self.__id = None
+        for opt, val in opts:
+            if opt == '--id' or opt == '-i':
+                if not val:
+                    print('option \'-i\' : Missing ID.')
+                    return ERR_PARAMS
+                try:
+                    self.__id = int(val)
+                except ValueError as s:
+                    print('Illegal ID : %s.' % val)
+                    return ERR_PARAMS
+
+        if not self.__id and len(extra) < 1:
+            print('Accounts missing.')
+            return ERR_PARAMS
+
+        if not self.__load_account_database():
+            print('Cannot access to account database.')
+            return ERR_DB
+
+        if self.__id:
+            username, session = self.__account_db.GetSessionFromID(self.__id)
+            if not username:
+                print('No account with ID %d' % self.__id)
+            else:
+                print('Logout %s' % username)
+                if not self.__account_db.DropSession(_id = self.__id):
+                    print('Failed : ', end = '')
+                    print(self.__account_db.Exception)
+                else:
+                    session.Logout()
+                
+
+        for username in extra:
+            id, session = self.__account_db.GetSessionFromUsername(username)
+            if not id:
+                print('No account %s' % username)
+                continue
+
+            if not self.__account_db.DropSession(_username = username):
+                print('Failed at %s : ' % username, end = '')
+                print(self.__account_db.Exception)
+            else:
+                print('%s Logouted.' % username)
+                session.Logout()
+
+        return ERR_OK
 
     def ListElectPlatform(self, _session):
         print('Available platform ID:')
@@ -480,7 +587,7 @@ class EAMSCommandShell:
         
     def ListAccounts(self):
         accounts = self.__account_db.ListAll()
-        if not accounts:
+        if accounts == None:
             print('Cannot access to database: ', end = '')
             return ERR_DB
         print('Session ID      Username')
@@ -562,10 +669,10 @@ class EAMSCommandShell:
             return ERR_PARAMS
         elif len(extra) > 0:
             self.__username = extra[0]
-        if id and self.__username:
-            print('confilct : options for session %d and account %s' % (id, self.__username))
+        if self.__id and self.__username:
+            print('confilct : options for session %d and account %s' % (self.__id, self.__username))
             return ERR_PARAMS
-        if not id and not self.__username:
+        if not self.__id and not self.__username:
             print('Account missing.')
             return ERR_PARAMS
 
@@ -574,7 +681,7 @@ class EAMSCommandShell:
             return ERR_PARAMS
 
         # load session
-        retval = self.__try_login()
+        retval, session = self.__try_login()
         if retval != ERR_OK:
             return retvel
 
@@ -608,10 +715,11 @@ class EAMSCommandShell:
 
 
     def DoElect(self, _arguments):
-        long_opt = ['--course-id=', '--cancel', '--password=', '--id=', '--platform=']
-        opts, extra = getopt.gnu_getopt(_arguments, 'i:p:I:P:', long_opt)
+        long_opt = ['course-id=', 'cancel', 'password=', 'id=', 'platform=', 'force']
+        opts, extra = getopt.gnu_getopt(_arguments, 'i:p:I:P:f', long_opt)
 
         course_id = None
+        force = False
         self.__password = None
         self.__username = None
         self.__id = None
@@ -650,6 +758,8 @@ class EAMSCommandShell:
                     return ERR_PARAMS
                 else:
                     self.__platform_id = val
+            elif opt == '--force' or opt == '-f':
+                force = True
             else:
                 print('Unknown options : %s' % opt)
 
@@ -662,10 +772,10 @@ class EAMSCommandShell:
             return ERR_PARAMS
         elif len(extra) > 0:
             self.__username = extra[0]
-        if id and self.__username:
-            print('confilct : options for session %d and account %s' % (id, self.__username))
+        if self.__id and self.__username:
+            print('confilct : options for session %d and account %s' % (self.__id, self.__username))
             return ERR_PARAMS
-        if not id and not self.__username:
+        if not self.__id and not self.__username:
             print('Account missing.')
             return ERR_PARAMS
 
@@ -677,12 +787,45 @@ class EAMSCommandShell:
             print('Platform missing. (see \'--platform\' or \'-P\')')
             return ERR_PARAMS
 
-        retval = self.__try_login()
+        retval, session = self.__try_login()
         if retval != ERR_OK:
             return retvel
 
+        plat = session.ElectCourse.Platform.get(self.__platform_id)
+        if not plat:
+            print('Platform not found : %s' % self.__platform_id)
+
+        course = plat.GetCourseByID(course_id)
+        if not course:
+            print('Cannot found the course with ID %d.' % course_id)
+            if not force:
+                return ERR_PARAMS
         
 
+        if self.__cancel:
+            if not course:
+                print('Cancel %d by force.' % course_id)
+            else:
+                print('Cancel %s (%d).' % (course['name'], course_id))
+            result, message = plat.Elect(course_id, CANCEL)
+        else:
+            if not course:
+                print('Elect %d by force.' % course_id)
+            else:
+                print('Elect %s (%d).' % (course['name'], course_id))
+            result, message = plat.Elect(course_id, ELECT)
+
+        if result:
+            print('Succeed.')
+        else:
+            print('Failed : %s' % message)
+
+        
+        if not self.__account_db.UpdateSessionByUsername(self.__username, session):
+            print('Cannot update state : ', end = '')
+            print(self.__account_db.Exception)
+
+        return ERR_OK
 
     def PrintHelp(self, _arguments):
         print(HELP_TEXT % _arguments[0])
