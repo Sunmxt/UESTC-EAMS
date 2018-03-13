@@ -141,7 +141,6 @@ class EAMSElectCourseSession:
                     ,'Referer' : EAMSBaseUrl + ElectCourseUrl
                 }
 
-            
             rep = self.__session.TryRequestGet(full_url, headers = header)
             if(not rep):
                 return False
@@ -181,13 +180,12 @@ class EAMSElectCourseSession:
             if not self.__basic_loaded:
                 self.__load_basic_infomation()
 
-            #rep = self.__session.TryRequestGet(\
-            #                EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
-            #                ,headers = header)
-            #if(not rep):
-            #    return 0
+            rep = self.__session.TryRequestGet(\
+                            EAMSBaseUrl + ElectStudentCount + '?profileId=%d' % self.__profile_id\
+                            ,headers = header)
+            if(not rep):
+                return 0
             
-
             lic = re.search(r'{(.*)}', rep.text)
             if(not lic):
                 return 0
@@ -464,6 +462,7 @@ class EAMSElectCourseSession:
 
         if(not rep):
             return False
+
 
 
         plat_info = re.findall(r'(\w)平台.*?\<a.+?href=\"(.*?)\".*?\>\S*?进入选课'\

@@ -40,7 +40,6 @@ ElectStudentCount = r'/stdElectCourse!queryStdCount.action'
 ElectOperate = r'/stdElectCourse!batchOperator.action'
 ElectCashChange = r'/stdVirtualCashElect!changeVirtualCash.action'
 
-
 '''
     Exceptions
 '''
