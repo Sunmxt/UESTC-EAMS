@@ -327,27 +327,25 @@ class EAMSElectCourseSession:
             #if(self.__elect_type == CASH):
             #    op_data['virtualCashCost' + _id] = _cash
 
-            pdb.set_trace()
             rep = self.__session.TryRequestPost(EAMSBaseUrl + ElectOperate + "?profileId=%d" % self.__profile_id \
                                 , headers = header, data = op_data)
             if(not rep):
                 return (False, 'Error occurs in POST request')
 
-            m = re.search(r'<div.*?>(.*?(成功|失败)[.<>]*?)(?:\s*</.*>)?</div>', rep.text, flags = re.DOTALL)
-            #m = re.search(r'<div(?:\s*.*?=\".*\")*\s*>(.*?(成功|失败).*?)(?:\s*</.*>)?</div>', rep.text, flags = re.DOTALL)
+            m = re.search(r'<div.*?>(.*?(成功|失败)[^<>]*?)(?:\s*</.*>)?.*?</div>', rep.text, flags = re.DOTALL)
             if(not m):
                 result_message = 'Unknown error.'
             else:
-                result_message = m.groups()[0].replace('\n', '').replace('\t', '')
+                result_message = m.groups()[0].replace('\n', '').replace('\t', '').replace('\r', '')
 
             # check whether operation is successful.
-            m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', rep.text, flags = re.DOTALL)
+            m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', rep.text.replace('\n', '').replace('\r', '').replace('\t', ''), flags = re.DOTALL)
             if(not m):
                 return (False, result_message)
 
             m = m.groups()[0].replace('true', 'True').replace('false', 'False')
             update_dict = eval('{' + m + '}', type('PARSE', (dict,), {'__getitem__':lambda s,n:n})())
-            if(update_dict.get('elected') != True):
+            if(update_dict.get('elected') != _op):
                 return (False, result_message)
 
             self.__elected.append(_id)
