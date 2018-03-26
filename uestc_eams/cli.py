@@ -12,7 +12,7 @@ import getopt
 import sqlite3
 import pickle
 from .session import Login, EAMSSession
-from .base import ELECT, CANCEL
+from .base import ELECT, CANCEL, RecordMethodException
 
 '''
     Some constants
@@ -81,22 +81,21 @@ class AccountDatabase:
         self.NoThrow = _no_throw
         self.__conn = self.__connect_to(_db_path)
 
-    def Throw(self):
-        if(self.Exception):
-            raise self.Exception
+    def __record_exception(self, _exception):
+        if self.NoThrow:
+            self.Exception = _exception
+        else:
+            raise _exception
+        return None
 
     def __connect_to(self, _db_path):
         conn = sqlite3.connect(_db_path)
         self.__ensure_integrailty(conn)
         return conn
 
+    @RecordMethodException(__record_exception, None, sqlite3.OperationalError)
     def __ensure_integrailty(self, conn):
-        try:
-            cur = conn.execute("SELECT name FROM sqlite_master where type=='table' and name=='Accounts'")
-        except sqlite3.OperationError as s:
-            self.Exception = s
-            self.Throw()
-            return None
+        cur = conn.execute("SELECT name FROM sqlite_master where type=='table' and name=='Accounts'")
 
         datas = cur.fetchall()
         cur.close()
@@ -113,20 +112,14 @@ class AccountDatabase:
                     COMMIT;
                 """)
             cur.close()
-            
+
+    @RecordMethodException(__record_exception, (None, None), sqlite3.OperationalError)
     def GetSessionFromUsername(self, _username):
         if not isinstance(_username, str):
             raise TypeError('_username should be str.')
 
         cur = self.__conn.cursor()
-        self.Exception = None
-        try:
-            cur.execute('SELECT * FROM Accounts where (Username == ?)', (_username,))
-        except sqlite3.OperationError as s:
-            self.Exception = s
-            self.Throw()
-            return (None, None)
-
+        cur.execute('SELECT * FROM Accounts where (Username == ?)', (_username,))
         res = cur.fetchall()
         cur.close()
         
@@ -134,38 +127,29 @@ class AccountDatabase:
             return (None, None)
         return (res[0][0], pickle.loads(res[0][2]))
 
+    @RecordMethodException(__record_exception, (None, None), sqlite3.OperationalError)
     def GetSessionFromID(self, _id):
         if not isinstance(_id, int):
             raise TypeError('_id should be an integar.')
 
         cur = self.__conn.cursor()
-        self.Exception = None
-        try:
-            cur.execute('SELECT Username, SessionObject FROM Accounts WHERE (ID == ?)', (_id,))
-            res = cur.fetchall()
-            cur.close()
-        except sqlite3.OperationalError as s:
-            self.Exception = s
-            self.Throw()
-            return (None, None)
+        cur.execute('SELECT Username, SessionObject FROM Accounts WHERE (ID == ?)', (_id,))
+        res = cur.fetchall()
+        cur.close()
 
         if len(res) < 1:
             return (None, None)
         return (res[0][0], pickle.loads(res[0][1]))
-        
-
+    
+    @RecordMethodException(__record_exception, None, sqlite3.OperationalError)
     def ListAll(self):
         cur = self.__conn.cursor()
-        try:
-            cur.execute('SELECT * FROM Accounts')
-        except sqlite3.OperationError as s:
-            self.Exception = s
-            self.Throw()
-            return None
+        cur.execute('SELECT * FROM Accounts')
         data = cur.fetchall()
         cur.close()
         return data
 
+    @RecordMethodException(__record_exception, False, sqlite3.OperationalError)
     def UpdateSessionByUsername(self, _username, _object):
         if not isinstance(_username, str):
             raise TypeError('_username should be str.')
@@ -174,18 +158,13 @@ class AccountDatabase:
 
         raw = pickle.dumps(_object)
         cur = self.__conn.cursor()
-        self.Exception = None
-        try:
-            cur.execute('UPDATE Accounts SET SessionObject=?  where (Username == ?)', (raw, _username))
-            self.__conn.commit()
-            cur.close()
-        except sqlite3.OperationalError as s:
-            self.Exception = s
-            self.Throw()
-            return False
+        cur.execute('UPDATE Accounts SET SessionObject=?  where (Username == ?)', (raw, _username))
+        self.__conn.commit()
+        cur.close()
 
         return True
-
+    
+    @RecordMethodException(__record_exception, False, sqlite3.OperationalError)
     def SaveSession(self, _username, _object):
         if not isinstance(_username, str):
             raise TypeError('_username should be str.')
@@ -194,46 +173,30 @@ class AccountDatabase:
 
         raw = pickle.dumps(_object)
         cur = self.__conn.cursor()
-        self.Exception = None
-        try:
-            cur.execute('INSERT INTO Accounts(Username, SessionObject) VALUES (?, ?)' , (_username, raw))
-            self.__conn.commit()
-        except sqlite3.OperationalError as s:
-            self.Exception = s
-            self.Throw()
-            return False
+        cur.execute('INSERT INTO Accounts(Username, SessionObject) VALUES (?, ?)' , (_username, raw))
+        self.__conn.commit()
         return True
 
+    @RecordMethodException(__record_exception, None, sqlite3.OperationalError)
     def QueryIDByUsername(self, _username):
         if not isinstance(_username, str):
             raise TypeError('_username should be str.') 
 
         cur = self.__conn.cursor()
-        self.Exception = None
-        try:
-            cur.execute('SELECT ID FROM Accounts where Username == ?' , (_username,))
-        except sqlite3.OperationalError as s:
-            self.Exception = s
-            self.Throw()
-            return False
+        cur.execute('SELECT ID FROM Accounts where Username == ?' , (_username,))
         res = cur.fetchall()
         cur.close()
         if len(res) < 1:
             return None
         return res[0][0]
 
+    @RecordMethodException(__record_exception, False, sqlite3.OperationalError)
     def QueryUsernameByID(self, _id):
         if not isinstance(_id, int):
             raise TypeError('_id should be an integer.') 
 
         cur = self.__conn.cursor()
-        self.Exception = None
-        try:
-            cur.execute('SELECT Username FROM Accounts where ID == ?', (_id,))
-        except sqlite3.OperationalError as s:
-            self.Exception = s
-            self.Throw()
-            return False
+        cur.execute('SELECT Username FROM Accounts where ID == ?', (_id,))
         res = cur.fetchall()
         cur.close()
         if len(res) < 1:
@@ -241,6 +204,7 @@ class AccountDatabase:
         return res[0][0]
         
 
+    @RecordMethodException(__record_exception, False, sqlite3.OperationalError)
     def DropSession(self, _username = None, _id = None):
         if _id and not isinstance(_id, int):
             raise('_id should be a integer')
@@ -255,23 +219,12 @@ class AccountDatabase:
                 if _id != username or not username:
                     return False
             cur = self.__conn.cursor()
-            self.Exception = None
-            try:
-                cur.execute('DELETE FROM Accounts WHERE ID == ?', (_id,))
-                self.__conn.commit()
-            except sqlite3.OperationalError as s:
-                self.Exception = s
-                self.Throw()
-                return False
+            cur.execute('DELETE FROM Accounts WHERE ID == ?', (_id,))
+            self.__conn.commit()
         elif _username:
             cur = self.__conn.cursor()
-            try:
-                cur.execute('DELETE FROM Accounts WHERE Username == ?' , (_username,))
-                self.__conn.commit()
-            except sqlite3.OperationalError as s:
-                self.Exception = s
-                self.Throw()
-                return False
+            cur.execute('DELETE FROM Accounts WHERE Username == ?' , (_username,))
+            self.__conn.commit()
         else:
             raise TypeError('_id or _username should be given.')
             return False

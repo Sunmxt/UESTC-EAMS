@@ -7,6 +7,7 @@
 
 import requests
 import re
+import functools
 
 '''
     Constants
@@ -128,7 +129,27 @@ def WrappedPost(_url, _my_session = None, **kwargs):
 
     return rep
 
+'''
+    Decorators
+'''
 
+def RecordMethodException(_record_function, fallback_value = None, *exceptions):
+    def RecordCatch(_target_func):
+        @functools.wraps(_target_func)
+        def WrappedFun(self, *args, **kwargs):
+            try:
+                return _target_func(self, *args, **kwargs)
+            except Exception as s:
+                for exception in exceptions:
+                    if isinstance(s, exception):
+                        _record_function(self, s)
+                        return fallback_value
+                return fallback_value
+        return WrappedFun
+    return RecordCatch
+                    
+                    
+    
     
 re_host = re.compile(r'(?:.*?\://)(.+?(?=/)|.+)')
 
