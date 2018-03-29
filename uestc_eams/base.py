@@ -7,6 +7,7 @@
 
 import requests
 import re
+import functools
 
 '''
     Constants
@@ -59,77 +60,27 @@ class EAMSException(Exception):
     def __init__(self, *kargs):
         super().__init__(*kargs)
 
+
 '''
-    Wrapped HTTP request method for dealing with cookies in redirect responses.
+    Decorators
 '''
 
-def WrappedGet(_url, _my_session = None, **kwargs):
-    '''
-        Wrapper for requests.get()
-    '''
-
-    if(_my_session):
-        ss = _my_session
-    else:
-        ss = requests.Session()
-
-    target_url = _url
-
-    allow_redirects = kwargs.get('allow_redirects')
-    if(allow_redirects != None):
-        kwargs.pop('allow_redirects')
-
-    cookies = kwargs.get('cookies')
-    if(cookies):
-        ss.cookies.update(cookies)
-
-    while True:
-        rep = ss.get(target_url, allow_redirects = False, **kwargs)
-        if(rep.is_redirect):
-            if(allow_redirects == False):
-                return rep
-            target_url = rep.headers['Location']
-            continue
-        break
-
-    rep.cookies.update(ss.cookies)
-
-    return rep
-
-def WrappedPost(_url, _my_session = None, **kwargs):
-    '''
-        Wrapper for requests.post()
-    '''
-
-    if(_my_session):
-        ss = _my_session
-    else:
-        ss = requests.Session()
-
-    target_url = _url
-    allow_redirects = kwargs.get('allow_redirects')
-    if(allow_redirects != None):
-        kwargs.pop('allow_redirects')
-
-    cookies = kwargs.get('cookies')
-    if(cookies):
-        ss.cookies.update(cookies)
-
-    rep = ss.post(target_url, allow_redirects = False, **kwargs)
-    if(allow_redirects == False):
-        return rep
-
-    if('data' in kwargs.keys()):
-        kwargs.pop('data')
-
-    while rep.is_redirect:
-        target_url = rep.headers['Location']
-        rep = ss.get(target_url, allow_redirects = False, **kwargs)
-
-    return rep
-
-
-    
+def RecordMethodException(_record_function, fallback_value = None, *exceptions):
+    def RecordCatch(_target_func):
+        @functools.wraps(_target_func)
+        def WrappedFun(self, *args, **kwargs):
+            try:
+                return _target_func(self, *args, **kwargs)
+            except Exception as s:
+                for exception in exceptions:
+                    if isinstance(s, exception):
+                        _record_function(self, s)
+                        return fallback_value
+                return fallback_value
+        return WrappedFun
+    return RecordCatch
+                    
+                       
 re_host = re.compile(r'(?:.*?\://)(.+?(?=/)|.+)')
 
 

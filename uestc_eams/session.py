@@ -5,7 +5,6 @@
 
 import requests
 import re
-
 from .base import *
 from .elect_course import EAMSElectCourseSession
     
@@ -109,10 +108,6 @@ class EAMSSession:
 
         return self.__login_form
 
-    def __update_cookies(self, _cookiejar):
-        self.__cookiejar.update(_cookiejar)
-        if (not self.__cookiejar.get('JSESSIONID_ids2')) and (not self.__cookiejar.get('JSESSIONID_ids1')):
-            raise EAMSSessionException('No JSESSIONID found.')
     def UpdateCookies(self, _cookiejar):
         return self.__update_cookies(_cookiejar)
 
@@ -202,15 +197,15 @@ class EAMSSession:
         }
 
         ss = requests.session()
-        rep = WrappedGet(PortalIndex, _my_session = ss\
-                        , headers = header)
+        rep = ss.get(PortalIndex, headers = header)
+
         if(rep.status_code != 200):
             ss.close()
             self.__logined = False
             raise EAMSLoginException('Server error [Status code : %d]' % rep.status_code)
             return False
 
-        if(not self.IsAuthResponse(rep)): # logined?
+        if -1 == rep.url.find(r'idas.uestc.edu.cn/authserver/login'): # logined?
             ss.close()
             self.__logined = True
             return True
@@ -223,11 +218,10 @@ class EAMSSession:
             return False
 
         post_data = self.__login_form.GeneratePostDataDict()
-        rep = WrappedPost(self.__login_post_url, data = post_data\
-                            , _my_session = ss, headers = header)
-        self.__update_cookies(ss.cookies)
+        rep = ss.post(self.__login_post_url, data = post_data, headers = header)
+        self.__cookiejar.update(ss.cookies)
 
-        if(self.IsAuthResponse(rep)): # failed
+        if -1 != rep.url.find(r'idas.uestc.edu.cn/authserver/login'): # logined?
             self.__trace_login_failure(ss, rep)
             return False
 
@@ -361,24 +355,21 @@ class EAMSSession:
         user_data = kwargs.get('data')
         allow_redirects = kwargs.get('allow_redirects')
 
-        if(allow_redirects != None):
-            kwargs.pop('allow_redirects')
+        #if(allow_redirects != None):
+        #    kwargs.pop('allow_redirects')
 
         target_host = re_host.search(target_url).groups()[0]
 
-        reauth = False
+        ss = requests.Session()
         this_op = _wrapped_op
         while True:
-            rep = this_op(target_url, allow_redirects = False ,**kwargs)
-
+            rep = this_op(ss, target_url, **kwargs)
             self.__cookiejar.update(rep.cookies)
             if rep.is_redirect:
                 target_url = rep.headers['Location']
-                if -1 == rep.url.find('idas.uestc.edu.cn/authserver/login'):
-                    reauth = True
-                elif allow_redirects == False:
+                if -1 != rep.url.find('idas.uestc.edu.cn/authserver/login') and allow_redirects == False:
                     return rep
-                this_op = WrappedGet
+                this_op = requests.Session.get
                 header['Referer'] = rep.url
                 kwargs['headers'] = header
                 kwargs['data'] = None
@@ -401,7 +392,7 @@ class EAMSSession:
 
                 m = re.findall(r'\<a.*?\s+href=\"(.*?)\".*?\>\s*?点击此处\s*?\</a\>继续', rep.text)
                 if(m):
-                    self.__update_cookies(rep.cookies)
+                    self.__cookiejar.update(rep.cookies)
                     target_url = m[0]
                     continue
 
@@ -420,14 +411,14 @@ class EAMSSession:
                 return None when any error occurs.
         '''
 
-        return self.TryRequestOp(_url, WrappedGet, **kwargs)
+        return self.TryRequestOp(_url, requests.Session.get, **kwargs)
 
     def TryRequestPost(self, _url, **kwargs):
         '''
             Wrapper for requests.post
         '''
 
-        return self.TryRequestOp(_url, WrappedPost, **kwargs)
+        return self.TryRequestOp(_url, requests.Session.post, **kwargs)
 
 
 
