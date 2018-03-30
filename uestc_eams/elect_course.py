@@ -468,7 +468,7 @@ class EAMSElectCourseSession:
 
         if(len(plat_info) == 0):
             self.__opened = False
-            self.__platform = []
+            self.__platform = {}
             self.__platform_by_url = {}
             return False
 
