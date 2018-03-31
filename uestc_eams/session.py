@@ -5,6 +5,7 @@
 
 import requests
 import re
+import pdb
 from .base import *
 from .elect_course import EAMSElectCourseSession
     
@@ -168,16 +169,6 @@ class EAMSSession:
         self.__elect_course = None
         self.__elect_course_loaded = False
 
-
-    def IsAuthResponse(self, _response):
-        '''
-
-            Check whether the specified is a authcentication response 
-
-        '''
-        
-        host = re_host.search(_response.url).groups()[0]
-        return host == 'idas.uestc.edu.cn'
 
     def Authenticate(self):
         '''
@@ -361,15 +352,20 @@ class EAMSSession:
         target_host = re_host.search(target_url).groups()[0]
 
         ss = requests.Session()
+        if _wrapped_op == requests.Session.get:
+            _wrapped_op = ss.get
+        elif _wrapped_op == requests.Session.post:
+            _wrapped_op = ss.post
+
         this_op = _wrapped_op
         while True:
-            rep = this_op(ss, target_url, **kwargs)
+            rep = this_op(target_url, **kwargs)
             self.__cookiejar.update(rep.cookies)
             if rep.is_redirect:
                 target_url = rep.headers['Location']
-                if -1 != rep.url.find('idas.uestc.edu.cn/authserver/login') and allow_redirects == False:
+                if -1 == target_url.find('idas.uestc.edu.cn/authserver/login') and allow_redirects == False:
                     return rep
-                this_op = requests.Session.get
+                this_op = ss.get
                 header['Referer'] = rep.url
                 kwargs['headers'] = header
                 kwargs['data'] = None
