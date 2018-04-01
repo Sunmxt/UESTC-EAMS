@@ -9,6 +9,7 @@
 '''
 
 from .base import *
+import pdb
 
 def parse_arrange(_week_info):
     c = 1
@@ -41,6 +42,10 @@ class EAMSElectCourseSession:
             , CASH : 'Cash'
             , CATCH : 'Catch'
         }
+
+        @property
+        def ProfileID(self):
+            return self.__profile_id
 
         @property
         def URL(self):
@@ -340,6 +345,7 @@ class EAMSElectCourseSession:
 
             # check whether operation is successful.
             m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', rep.text.replace('\n', '').replace('\r', '').replace('\t', ''), flags = re.DOTALL)
+
             if(not m):
                 return (False, result_message)
 
@@ -348,7 +354,11 @@ class EAMSElectCourseSession:
             if(update_dict.get('elected') != _op):
                 return (False, result_message)
 
-            self.__elected.append(_id)
+
+            if _op == CANCEL:
+                self.__elected.remove(_id)
+            else:
+                self.__elected.append(_id)
             return (True, result_message)
 
         def Refresh(self):
@@ -413,10 +423,7 @@ class EAMSElectCourseSession:
         return self.__platform
 
 
-    def __init__(self, _cookiejar_ref_list, _session):
-        if(not isinstance(_cookiejar_ref_list, list)):
-            raise TypeError('_cookiejar_ref_list should be a list')
-
+    def __init__(self, _session):
         #if(not isinstance(_session, EAMSSession)):
         #    raise TypeError('_session should be a EAMSSession')
 
@@ -424,7 +431,6 @@ class EAMSElectCourseSession:
         self.__opened = False
         self.__platform = {}
         self.__platform_loaded = False
-        self.__cookiejar_ref_list = _cookiejar_ref_list
         self.__session = _session
 
         self.__platform_by_url = {}
