@@ -9,6 +9,7 @@
 '''
 
 from .base import *
+import pdb
 
 def parse_arrange(_week_info):
     c = 1
@@ -344,6 +345,7 @@ class EAMSElectCourseSession:
 
             # check whether operation is successful.
             m = re.search(r'window\.electCourseTable\.lessons\({id:\d+}\)\.update\({(.*?)}\)', rep.text.replace('\n', '').replace('\r', '').replace('\t', ''), flags = re.DOTALL)
+
             if(not m):
                 return (False, result_message)
 
@@ -352,7 +354,11 @@ class EAMSElectCourseSession:
             if(update_dict.get('elected') != _op):
                 return (False, result_message)
 
-            self.__elected.append(_id)
+
+            if _op == CANCEL:
+                self.__elected.remove(_id)
+            else:
+                self.__elected.append(_id)
             return (True, result_message)
 
         def Refresh(self):

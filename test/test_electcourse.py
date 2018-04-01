@@ -60,7 +60,7 @@ class TestElectCourseSession(unittest.TestCase):
             elif -1 != _url.find('http://eams.uestc.edu.cn/eams/stdElectCourse!data.action?profileId=1328'):
                 rep = MakeResponse({
                         'response_code' : 200
-                        , 'text' : r"var lessionJSONs = [{id:330983,no:'A1513220.01',name:'编译从入门到放弃',code:'A1513220',credits:0.1,courseId:39480,startWeek:1,endWeek:12,courseTypeId:17,courseTypeName:'不是课程',courseTypeCode:'X',scheduled:true,hasTextBook:false,period:32,weekHour:4,revertCount:0,withdrawable:false,textbooks:'',teachers:'<a href=\'javascript:showDescription(5120044)\'>666<\/a>',crossCollege:false,campusCode:'1',campusName:'清水河校区',remark:'Just test 1',electCourseRemark:'',arrangeInfo:[{weekDay:2,weekState:'01111111111110000000000000000000000000000000000000000',startUnit:9,endUnit:11,weekStateText:'第1-12周',rooms:'立人楼B108'}],examArrange:''}, {id:332737,no:'A1513220.01',name:'数据库从删库到跑路',code:'A1518220',credits:0.1,courseId:31180,startWeek:1,endWeek:12,courseTypeId:17,courseTypeName:'不是课程1',courseTypeCode:'X',scheduled:true,hasTextBook:false,period:32,weekHour:4,revertCount:0,withdrawable:false,textbooks:'',teachers:'<a href=\'javascript:showDescription(5120044)\'>777<\/a>',crossCollege:false,campusCode:'1',campusName:'清水河校区',remark:'Just test 2',electCourseRemark:'',arrangeInfo:[{weekDay:2,weekState:'00101010101010101010000000000000000000000000000000000',startUnit:9,endUnit:11,weekStateText:'无Text',rooms:'BC108'}],examArrange:''}, {id:331038,no:'A1513220.01',name:'不知道什么课程',code:'A1518220',credits:0.1,courseId:31180,startWeek:1,endWeek:12,courseTypeId:17,courseTypeName:'不是课程2',courseTypeCode:'X',scheduled:true,hasTextBook:false,period:32,weekHour:4,revertCount:0,withdrawable:false,textbooks:'',teachers:'<a href=\'javascript:showDescription(5120044)\'>888<\/a>',crossCollege:false,campusCode:'1',campusName:'清水河校区',remark:'Just test 3',electCourseRemark:'',arrangeInfo:[{weekDay:2,weekState:'00101010101010101010000100010000000000000000000000000',startUnit:9,endUnit:11,weekStateText:'无Text',rooms:'BC108'}],examArrange:''}]"
+                        , 'text' : r"var lessionJSONs = [{id:330983,no:'A1513220.01',name:'编译从入门到放弃',code:'A1513220',credits:0.1,courseId:39480,startWeek:1,endWeek:12,courseTypeId:17,courseTypeName:'不是课程',courseTypeCode:'X',scheduled:true,hasTextBook:false,period:32,weekHour:4,revertCount:0,withdrawable:false,textbooks:'',teachers:'<a href=\'javascript:showDescription(5120044)\'>666<\/a>',crossCollege:false,campusCode:'1',campusName:'清水河校区',remark:'Just test 1',electCourseRemark:'',arrangeInfo:[{weekDay:2,weekState:'01111111111110000000000000000000000000000000000000000',startUnit:9,endUnit:11,weekStateText:'第1-12周',rooms:'立人楼B108'}],examArrange:''}, {id:332737,no:'A1513220.01',name:'数据库从删库到跑路',code:'A1518220',credits:0.1,courseId:31180,startWeek:1,endWeek:12,courseTypeId:17,courseTypeName:'不是课程1',courseTypeCode:'X',scheduled:true,hasTextBook:false,period:32,weekHour:4,revertCount:0,withdrawable:false,textbooks:'',teachers:'<a href=\'javascript:showDescription(5120044)\'>777<\/a>',crossCollege:false,campusCode:'1',campusName:'清水河校区',remark:'Just test 2',electCourseRemark:'',arrangeInfo:[{weekDay:2,weekState:'00101010101010101010000000000000000000000000000000000',startUnit:9,endUnit:11,weekStateText:'无Text',rooms:'BC108'}],examArrange:''}, {id:331038,no:'A1513220.01',name:'操作系统从入门到入土',code:'A1518220',credits:0.1,courseId:31180,startWeek:1,endWeek:12,courseTypeId:17,courseTypeName:'不是课程2',courseTypeCode:'X',scheduled:true,hasTextBook:false,period:32,weekHour:4,revertCount:0,withdrawable:false,textbooks:'',teachers:'<a href=\'javascript:showDescription(5120044)\'>888<\/a>',crossCollege:false,campusCode:'1',campusName:'清水河校区',remark:'Just test 3',electCourseRemark:'',arrangeInfo:[{weekDay:2,weekState:'00101010101010101010000100010000000000000000000000000',startUnit:9,endUnit:11,weekStateText:'无Text',rooms:'BC108'}],examArrange:''}]"
                     })
                 rep.url = _url
                 self.__get_course_data = True
@@ -77,7 +77,63 @@ class TestElectCourseSession(unittest.TestCase):
                 return rep
 
             raise Exception('Unexcepted GET request: ' + _url)
+
+
+
+
         elif _op == uestc_eams.session.requests.Session.post:
+            if -1 != _url.find(r'http://eams.uestc.edu.cn/eams/stdElectCourse!batchOperator.action?profileId=1328'):
+                self.assertIn('headers', kwargs)
+                self.assertIn('data', kwargs)
+                headers = kwargs['headers']
+                data = kwargs['data'] 
+                self.assertIn('Referer', headers)
+                self.assertIn('X-Requested-With', headers)
+                self.assertIn('Origin', headers)
+                self.assertEqual(headers['Origin'], 'http://eams.uestc.edu.cn')
+                self.assertEqual(headers['Referer'], 'http://eams.uestc.edu.cn/eams/stdElectCourse!defaultPage.action?electionProfile.id=1328')
+                self.assertEqual(headers['X-Requested-With'], 'XMLHttpRequest')
+                self.assertIn('operator0', data)
+                self.assertIsInstance(data['operator0'], str)
+
+                op = data['operator0'].split(':')
+                self.assertTrue(op[0].isdigit())
+                if op[1] == 'true':
+                    self.__elect_op = True
+                    print('Try to elect %s.' % op[0])
+                    rep = MakeResponse({
+                            'response_code' : 200
+                            , 'text' : """
+<div style="width:85%;color:green;text-align:left;margin:auto;">
+				Test选课成功</br>
+			</div>
+			<script type="text/javascript">
+				if(window.electCourseTable){
+						window.electCourseTable.lessons({id:""" + op[0] + """})
+							.update({
+								defaultElected : true,
+								elected : true
+							    });"""
+                        })
+                elif op[1] == 'false':
+                    self.__elect_op = False
+                    print('Try to cancel %s.' % op[0])
+                    rep = MakeResponse({
+                            'response_code' : 200
+                            , 'text' : """<div style="width:85%;color:green;text-align:left;margin:auto;">
+				Test退课成功</br>
+			</div>
+		</td>
+			<script type="text/javascript">
+				if(window.electCourseTable){
+						window.electCourseTable.lessons({id:""" + op[0] + """})
+							.update({
+								defaultElected : false,
+								elected : false});"""
+                        })
+                rep.url = _url
+                return rep
+                
             raise Exception('Unexcepted POST requests: ' + _url)
 
         raise Exception('Unexcepted HTTP Method.')
@@ -103,7 +159,7 @@ class TestElectCourseSession(unittest.TestCase):
         print('passed.', end = '\n\n')
 
         # Test querying elect course closed enterence
-        print('--> test load platform [no enterence]')
+        print('--> test load platform [no enterence] <--')
         self.__get_enterence_page_ok = False
         self.__enterence_open = False
         ecss = uestc_eams.elect_course.EAMSElectCourseSession(ss)
@@ -153,7 +209,7 @@ class TestElectCourseSession(unittest.TestCase):
                     , 'arrange' : ({'day':2, 'start':9, 'end':11, 'weeks':((3,3),(5,5),(7,7),(9,9),(11,11),(13,13),(15,15),(17,17),(19,19)), 'room':'BC108'},)
                 }
                 , {
-                    'name': '不知道什么课程'
+                    'name': '操作系统从入门到入土'
                     , 'id' : 331038
                     , 'credits': 0.1
                     , 'teachers' : ('888', )
@@ -201,5 +257,22 @@ class TestElectCourseSession(unittest.TestCase):
         self.assertEqual(platform.Counts, c)
         self.assertTrue(self.__get_student_count)
         print('passed.', end = '\n\n')
-        
 
+
+        # Test elect
+        print('--> test electing <--')
+        self.__elect_op = None
+        self.assertTrue(platform.Elect(330983, uestc_eams.ELECT))
+        self.assertEqual(self.__elect_op, True)
+        self.assertIn(330983, platform.Elected)
+        print('passed.', end = '\n\n')
+
+        # Test cancel
+        print('--> test canceling <--')
+        self.__elect_op = None
+        self.assertTrue(platform.Elect(331038, uestc_eams.CANCEL))
+        self.assertEqual(self.__elect_op, False)
+        self.assertNotIn(331038, platform.Elected)
+        print('passed.', end = '\n\n')
+
+        
