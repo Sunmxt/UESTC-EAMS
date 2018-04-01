@@ -43,6 +43,10 @@ class EAMSElectCourseSession:
         }
 
         @property
+        def ProfileID(self):
+            return self.__profile_id
+
+        @property
         def URL(self):
             return self.__origin_url
 
@@ -413,10 +417,7 @@ class EAMSElectCourseSession:
         return self.__platform
 
 
-    def __init__(self, _cookiejar_ref_list, _session):
-        if(not isinstance(_cookiejar_ref_list, list)):
-            raise TypeError('_cookiejar_ref_list should be a list')
-
+    def __init__(self, _session):
         #if(not isinstance(_session, EAMSSession)):
         #    raise TypeError('_session should be a EAMSSession')
 
@@ -424,7 +425,6 @@ class EAMSElectCourseSession:
         self.__opened = False
         self.__platform = {}
         self.__platform_loaded = False
-        self.__cookiejar_ref_list = _cookiejar_ref_list
         self.__session = _session
 
         self.__platform_by_url = {}

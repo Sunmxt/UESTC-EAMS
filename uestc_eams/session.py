@@ -152,7 +152,7 @@ class EAMSSession:
             raise EAMSSessionException('Not logined.')
             return None
            
-        ecss = EAMSElectCourseSession([self.__cookiejar], self)
+        ecss = EAMSElectCourseSession(self)
 
         return ecss
 
