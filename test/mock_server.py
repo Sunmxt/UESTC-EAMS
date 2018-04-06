@@ -143,7 +143,7 @@ class LoginMockServer(RequestsSessionMockServer):
         rep.url = _url
         return rep
 
-    @MockServer.Route(r'http://eams\.uestc\.edu\.cn(/.*)?', ['GET'])
+    @MockServer.Route(r'^http://eams\.uestc\.edu\.cn/eams$', ['GET'])
     def eams_requested(self, _session, _url, *args, **kwargs):
         if True == self.ExpireTestTiggered:
             rep = MakeResponse({'response_code' : 200, 'text' : 'ok'})
