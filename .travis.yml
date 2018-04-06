@@ -12,7 +12,7 @@ install:
     - pip install codecov
 
 script:
-    - coverage run run_test.py
+    - coverage -m unittest discover
 
 after_success:
     - codecov

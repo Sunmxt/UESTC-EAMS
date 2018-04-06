@@ -1,7 +1,8 @@
 # Ignore __pycache__
 __pycache__/
-
+/.coverage
 
 # Ignore some files and directorys for myself
 /cappkg/
+
 

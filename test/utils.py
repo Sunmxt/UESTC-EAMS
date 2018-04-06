@@ -5,6 +5,7 @@
 '''
 
 import uestc_eams
+from functools import wraps
 
 class HookedMethod:
     '''
@@ -33,5 +34,39 @@ def MakeResponse(_case):
     for key, val in zip(headers.keys(), headers.values()):
         rep.headers[key] = val
     rep.status_code = _case.get('response_code', 0)
-    return rep 
+    return rep
+
+
+'''
+    Decorator
+'''
+
+def CheckType(**_type_dict):
+    """
+        Decorator CheckType().
+
+        Check whether keyword arguments are of specified types.
+
+        :Example:
+            @CheckType(_arg1 = str, _arg2 = (str, int))
+            def function1(_arg1, _arg2):
+                ... ...
+    """
+    def decorate(_function):
+        @wraps(_function)
+        def checked_function(*args, **kwargs):
+            # For all arguments.
+            checked_keys = _type_dict.keys()
+            for key, value in zip(kwargs.keys(), kwargs.values()):
+                if key in checked_keys:
+                    accepted_types = _type_dict[key]
+                    if isinstance(accepted_types, type):
+                        if type(value) is accepted_types:
+                            continue
+                    elif type(value) in _type_dict[key]:
+                            continue
+                    raise TypeError('Invailed type of %s' % key)
+            return _function(*args, **kwargs)
+        return checked_function
+    return decorate
 
