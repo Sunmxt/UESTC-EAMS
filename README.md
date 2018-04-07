@@ -1,5 +1,7 @@
 # **UESTC-EAMS**
 
+[![TravisCI](https://img.shields.io/travis/Sunmxt/UESTC-EAMS.svg?longCache=true&style=flat-square)](https://travis-ci.org/Sunmxt/UESTC-EAMS/) [![Codecov](https://img.shields.io/codecov/c/github/Sunmxt/UESTC-EAMS.svg?longCache=true&style=flat-square)](https://codecov.io/gh/Sunmxt/UESTC-EAMS/) [![PythonVersion](https://img.shields.io/badge/Python-%3E%3D%203.3-blue.svg?longCache=true&style=flat-square)](https://www.python.org/) [![License](https://img.shields.io/badge/License-Apache-green.svg?longCache=true&style=flat-square)](https://github.com/Sunmxt/UESTC-EAMS/blob/master/LICENSE)
+
 ---
 
 #### 简介
